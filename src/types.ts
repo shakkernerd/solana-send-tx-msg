@@ -62,3 +62,16 @@ export interface BulkMessageResult {
 	results: BulkTransactionResult[]
 	overallSuccess: boolean
 }
+
+// New interfaces for file-based recipient handling
+export interface FileRecipientConfig extends Omit<BulkMessageConfig, "recipientAddresses"> {
+	recipientsFile: string
+}
+
+export interface FileValidationResult {
+	isValid: boolean
+	addresses: string[]
+	validAddresses: PublicKey[]
+	invalidAddresses: string[]
+	error?: string
+}
