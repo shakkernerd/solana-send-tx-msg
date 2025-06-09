@@ -1,0 +1,11 @@
+# Recipients file for Solana Message Sender
+# One address per line
+# Lines starting with # are comments and will be ignored
+# Empty lines are also ignored
+
+# Example addresses (replace with real addresses):
+# 11111111111111111111111111111112
+# 22222222222222222222222222222223
+# 33333333333333333333333333333334
+
+# Add your recipient addresses below:
