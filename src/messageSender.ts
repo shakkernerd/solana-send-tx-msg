@@ -1,6 +1,7 @@
 import { Connection, PublicKey, Transaction, TransactionInstruction, Keypair, sendAndConfirmTransaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js"
-import { MessageConfig, TransactionResult, SolanaConfig, BulkMessageConfig, BulkMessageResult, BulkTransactionResult } from "./types"
+import { MessageConfig, TransactionResult, SolanaConfig, BulkMessageConfig, BulkMessageResult, BulkTransactionResult, FileRecipientConfig } from "./types"
 import { getConfig, getExplorerUrl } from "./config"
+import { FileUtils } from "./fileUtils"
 
 export class SolanaMessageSender {
 	private connection: Connection
@@ -319,6 +320,59 @@ export class SolanaMessageSender {
 			totalFailed,
 			results,
 			overallSuccess,
+		}
+	}
+
+	/**
+	 * Sends messages to recipients from a file (recipients.txt)
+	 * Reads addresses from the specified file and sends messages to all valid addresses
+	 */
+	async sendMessagesFromFile(config: FileRecipientConfig): Promise<BulkMessageResult> {
+		console.log(`📄 Reading recipients from file: ${config.recipientsFile}`)
+
+		try {
+			// Read and validate addresses from file
+			const validation = await FileUtils.readRecipientsFile(config.recipientsFile)
+
+			// Handle validation results
+			if (!validation.isValid) {
+				console.error(`❌ ${validation.error}`)
+				return {
+					totalSent: 0,
+					totalFailed: 0,
+					results: [],
+					overallSuccess: false,
+				}
+			}
+
+			// Show warnings for invalid addresses but continue with valid ones
+			FileUtils.validateRecipients(validation)
+
+			console.log(`📋 Found ${validation.validAddresses.length} valid addresses in ${config.recipientsFile}`)
+
+			// Convert to BulkMessageConfig and send messages
+			const bulkConfig: BulkMessageConfig = {
+				message: config.message,
+				recipientAddresses: validation.validAddresses,
+				senderKeypair: config.senderKeypair,
+				connection: config.connection,
+				commitment: config.commitment,
+				skipPreflight: config.skipPreflight,
+				delayBetweenTx: config.delayBetweenTx,
+				continueOnError: config.continueOnError,
+			}
+
+			return await this.sendBulkMessages(bulkConfig)
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : "Unknown error"
+			console.error(`❌ Failed to process recipients file: ${errorMessage}`)
+
+			return {
+				totalSent: 0,
+				totalFailed: 0,
+				results: [],
+				overallSuccess: false,
+			}
 		}
 	}
 }
