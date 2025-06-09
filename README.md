@@ -79,34 +79,36 @@ This will:
 
 ### 2. CLI Usage
 
+> **⚠️ Important:** When using messages with spaces, use **single quotes** (`'`) instead of double quotes (`"`) to avoid shell parsing issues.
+
 Send a custom message to a specific address:
 
 ```bash
-npm run dev -- --message "Hello from Solana!" --recipient <recipient-address>
+npm run dev -- --message 'Hello from Solana!' --recipient <recipient-address>
 ```
 
 Send a memo-only message (no SOL transfer):
 
 ```bash
-npm run dev -- --message "This is a memo" --memo-only
+npm run dev -- --message 'This is a memo' --memo-only
 ```
 
 **NEW: Bulk messaging to multiple recipients:**
 
 ```bash
-npm run dev -- --message "Hello everyone!" --recipients "addr1,addr2,addr3" --bulk
+npm run dev -- --message 'Hello everyone!' --recipients "addr1,addr2,addr3" --bulk
 ```
 
 **NEW: Send multiple memo-only messages:**
 
 ```bash
-npm run dev -- --messages "Hello","World","Test" --memo-only --bulk
+npm run dev -- --messages 'Hello','World','Test' --memo-only --bulk
 ```
 
 **Bulk messaging with advanced options:**
 
 ```bash
-npm run dev -- --message "Hello" --recipients "addr1,addr2" --bulk --delay 1000 --continue-on-error
+npm run dev -- --message 'Hello' --recipients "addr1,addr2" --bulk --delay 1000 --continue-on-error
 ```
 
 **NEW: File-based recipients:**
@@ -116,10 +118,10 @@ npm run dev -- --message "Hello" --recipients "addr1,addr2" --bulk --delay 1000 
 npm run dev -- --create-sample
 
 # Send to addresses from recipients.txt
-npm run dev -- --message "Hello everyone!" --recipients-file recipients.txt
+npm run dev -- --message 'Hello everyone!' --recipients-file recipients.txt
 
 # Send from custom file with options
-npm run dev -- --message "Hello" --recipients-file my-list.txt --delay 1000 --continue-on-error
+npm run dev -- --message 'Hello' --recipients-file my-list.txt --delay 1000 --continue-on-error
 ```
 
 Show help:
@@ -286,19 +288,19 @@ The system automatically validates all addresses in the file:
 **Basic usage:**
 
 ```bash
-npm run dev -- --message "Hello!" --recipients-file recipients.txt
+npm run dev -- --message 'Hello!' --recipients-file recipients.txt
 ```
 
 **With custom file:**
 
 ```bash
-npm run dev -- --message "Hello!" --recipients-file ./my-addresses.txt
+npm run dev -- --message 'Hello!' --recipients-file ./my-addresses.txt
 ```
 
 **With error handling options:**
 
 ```bash
-npm run dev -- --message "Hello!" --recipients-file recipients.txt --continue-on-error --delay 2000
+npm run dev -- --message 'Hello!' --recipients-file recipients.txt --continue-on-error --delay 2000
 ```
 
 ### File Utility Methods
@@ -580,10 +582,16 @@ if (validation.isValid) {
     - Verify the network configuration
 
 4. **File-based recipients issues**
+
     - Ensure the recipients file exists and is readable
     - Check file format: one address per line
     - Verify all addresses are valid Solana public keys
     - Use `--create-sample` to generate a template file
+
+5. **Command hanging or not responding**
+    - Use **single quotes** instead of double quotes for messages with spaces
+    - Example: `npm run dev -- --message 'Hello world!' --recipients-file recipients.txt`
+    - Double quotes may cause shell parsing issues in some environments
 
 ## Development
 
