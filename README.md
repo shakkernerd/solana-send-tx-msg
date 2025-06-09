@@ -6,11 +6,15 @@ A TypeScript project for sending messages using transactions on the Solana block
 
 -   📨 Send messages to specific addresses with small SOL transfers
 -   📝 Send memo-only messages without any SOL transfer
+-   🚀 **NEW: Bulk messaging to multiple recipients**
+-   📋 **NEW: Send multiple memo-only messages in batch**
 -   💼 Support for multiple wallet loading methods (file, private key, or generate new)
 -   🌐 Configurable for devnet, testnet, or mainnet-beta
 -   🔍 Automatic balance checking and validation
 -   🔗 Direct links to Solana Explorer for transaction viewing
 -   ⚡ CLI interface for quick message sending
+-   ⏱️ Configurable delays between transactions to avoid rate limiting
+-   🛡️ Error handling with continue-on-error option
 
 ## Installation
 
@@ -85,6 +89,24 @@ Send a memo-only message (no SOL transfer):
 npm run dev -- --message "This is a memo" --memo-only
 ```
 
+**NEW: Bulk messaging to multiple recipients:**
+
+```bash
+npm run dev -- --message "Hello everyone!" --recipients "addr1,addr2,addr3" --bulk
+```
+
+**NEW: Send multiple memo-only messages:**
+
+```bash
+npm run dev -- --messages "Hello","World","Test" --memo-only --bulk
+```
+
+**Bulk messaging with advanced options:**
+
+```bash
+npm run dev -- --message "Hello" --recipients "addr1,addr2" --bulk --delay 1000 --continue-on-error
+```
+
 Show help:
 
 ```bash
@@ -92,6 +114,8 @@ npm run dev -- --help
 ```
 
 ### 3. Programmatic Usage
+
+**Single message:**
 
 ```typescript
 import { SolanaMessageSender, WalletUtils } from "./src/index"
@@ -118,6 +142,44 @@ async function sendMessage() {
 		console.log(`Message sent! Signature: ${result.signature}`)
 		console.log(`Explorer: ${result.explorerUrl}`)
 	}
+}
+```
+
+**NEW: Bulk messaging:**
+
+```typescript
+import { SolanaMessageSender, WalletUtils } from "./src/index"
+
+async function sendBulkMessages() {
+	const messageSender = new SolanaMessageSender({
+		rpcUrl: "https://api.devnet.solana.com",
+		network: "devnet",
+	})
+
+	const senderKeypair = WalletUtils.loadKeypairFromFile("./wallet.json")
+
+	// Send to multiple recipients
+	const recipients = ["address1...", "address2...", "address3..."].map((addr) => WalletUtils.toPublicKey(addr))
+
+	const result = await messageSender.sendBulkMessages({
+		message: "Hello everyone!",
+		recipientAddresses: recipients,
+		senderKeypair,
+		delayBetweenTx: 1000, // 1 second delay
+		continueOnError: true, // Don't stop on errors
+		commitment: "confirmed",
+	})
+
+	console.log(`Sent: ${result.totalSent}, Failed: ${result.totalFailed}`)
+
+	// Check individual results
+	result.results.forEach((res, i) => {
+		if (res.success) {
+			console.log(`✅ [${i + 1}] ${res.signature}`)
+		} else {
+			console.log(`❌ [${i + 1}] ${res.error}`)
+		}
+	})
 }
 ```
 
@@ -188,8 +250,40 @@ src/
 
 -   `sendMessage(config: MessageConfig)` - Send message with SOL transfer
 -   `sendMemoOnly(config: MemoConfig)` - Send memo-only message
+-   `sendBulkMessages(config: BulkMessageConfig)` - **NEW: Send messages to multiple recipients**
+-   `sendBulkMemoOnly(config: BulkMemoConfig)` - **NEW: Send multiple memo-only messages**
 -   `getBalance(publicKey: PublicKey)` - Get wallet balance in SOL
 -   `checkBalance(publicKey: PublicKey, required?: number)` - Check if wallet has sufficient balance
+
+#### New Bulk Message Interfaces
+
+```typescript
+interface BulkMessageConfig {
+	message: string
+	recipientAddresses: PublicKey[]
+	senderKeypair: Keypair
+	connection?: Connection
+	commitment?: "processed" | "confirmed" | "finalized"
+	skipPreflight?: boolean
+	delayBetweenTx?: number // milliseconds delay between transactions
+	continueOnError?: boolean // continue sending even if some fail
+}
+
+interface BulkMessageResult {
+	totalSent: number
+	totalFailed: number
+	results: BulkTransactionResult[]
+	overallSuccess: boolean
+}
+
+interface BulkTransactionResult {
+	recipientAddress: string
+	signature: string
+	success: boolean
+	error?: string
+	explorerUrl?: string
+}
+```
 
 ### WalletUtils
 
@@ -204,7 +298,13 @@ src/
 
 ## Examples
 
-### Send Message to Multiple Recipients
+### Run the Bulk Messaging Example
+
+```bash
+npm run bulk-example
+```
+
+### Send Message to Multiple Recipients (OLD WAY - Sequential)
 
 ```typescript
 const recipients = ["Address1...", "Address2...", "Address3..."]
@@ -220,7 +320,23 @@ for (const recipient of recipients) {
 }
 ```
 
-### Batch Memo Messages
+### Send Message to Multiple Recipients (NEW WAY - Bulk)
+
+```typescript
+const recipients = ["Address1...", "Address2...", "Address3..."].map((addr) => WalletUtils.toPublicKey(addr))
+
+const result = await messageSender.sendBulkMessages({
+	message: "Hello everyone!",
+	recipientAddresses: recipients,
+	senderKeypair,
+	delayBetweenTx: 1000,
+	continueOnError: true,
+})
+
+console.log(`✅ Sent: ${result.totalSent}, ❌ Failed: ${result.totalFailed}`)
+```
+
+### Batch Memo Messages (OLD WAY - Sequential)
 
 ```typescript
 const messages = ["Message 1", "Message 2", "Message 3"]
@@ -231,6 +347,22 @@ for (const message of messages) {
 		senderKeypair,
 	})
 }
+```
+
+### Batch Memo Messages (NEW WAY - Bulk)
+
+```typescript
+const messages = ["Message 1", "Message 2", "Message 3"]
+
+const result = await messageSender.sendBulkMemoOnly({
+	message: "Default message",
+	messages: messages,
+	senderKeypair,
+	delayBetweenTx: 500,
+	continueOnError: true,
+})
+
+console.log(`✅ Sent: ${result.totalSent}, ❌ Failed: ${result.totalFailed}`)
 ```
 
 ## Security Notes
