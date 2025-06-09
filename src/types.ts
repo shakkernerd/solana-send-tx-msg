@@ -35,3 +35,30 @@ export interface MessageInstruction {
 	}>
 	data: Uint8Array
 }
+
+// New interfaces for bulk messaging
+export interface BulkMessageConfig {
+	message: string
+	recipientAddresses: PublicKey[]
+	senderKeypair: Keypair
+	connection?: Connection
+	commitment?: "processed" | "confirmed" | "finalized"
+	skipPreflight?: boolean
+	delayBetweenTx?: number // milliseconds delay between transactions
+	continueOnError?: boolean // continue sending even if some fail
+}
+
+export interface BulkTransactionResult {
+	recipientAddress: string
+	signature: string
+	success: boolean
+	error?: string
+	explorerUrl?: string
+}
+
+export interface BulkMessageResult {
+	totalSent: number
+	totalFailed: number
+	results: BulkTransactionResult[]
+	overallSuccess: boolean
+}
