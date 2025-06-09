@@ -17,7 +17,7 @@ A TypeScript project for sending messages using transactions on the Solana block
 1. Clone the repository:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/shakkernerd/solana-send-tx-msg.git
 cd solana-send-tx-msg
 ```
 
