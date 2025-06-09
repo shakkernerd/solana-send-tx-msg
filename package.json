@@ -8,7 +8,8 @@
 		"start": "node dist/index.js",
 		"dev": "ts-node src/index.ts",
 		"clean": "rm -rf dist",
-		"quickstart": "npm run build && node examples/quickstart.js"
+		"quickstart": "npm run build && node examples/quickstart.js",
+		"bulk-example": "npm run build && node examples/bulk-messaging.js"
 	},
 	"keywords": [
 		"solana",
