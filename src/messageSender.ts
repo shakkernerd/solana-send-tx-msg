@@ -1,5 +1,5 @@
 import { Connection, PublicKey, Transaction, TransactionInstruction, Keypair, sendAndConfirmTransaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js"
-import { MessageConfig, TransactionResult, SolanaConfig } from "./types"
+import { MessageConfig, TransactionResult, SolanaConfig, BulkMessageConfig, BulkMessageResult, BulkTransactionResult } from "./types"
 import { getConfig, getExplorerUrl } from "./config"
 
 export class SolanaMessageSender {
@@ -143,5 +143,182 @@ export class SolanaMessageSender {
 	async checkBalance(publicKey: PublicKey, requiredSol: number = 0.001): Promise<boolean> {
 		const balance = await this.getBalance(publicKey)
 		return balance >= requiredSol
+	}
+
+	/**
+	 * Sends messages to multiple recipients with SOL transfers
+	 */
+	async sendBulkMessages(config: BulkMessageConfig): Promise<BulkMessageResult> {
+		console.log(`Sending message to ${config.recipientAddresses.length} recipients`)
+		console.log(`Message: "${config.message}"`)
+
+		const results: BulkTransactionResult[] = []
+		let totalSent = 0
+		let totalFailed = 0
+
+		for (let i = 0; i < config.recipientAddresses.length; i++) {
+			const recipient = config.recipientAddresses[i]
+			const recipientAddress = recipient.toBase58()
+
+			try {
+				console.log(`[${i + 1}/${config.recipientAddresses.length}] Sending to ${recipientAddress}`)
+
+				const result = await this.sendMessage({
+					message: config.message,
+					recipientAddress: recipient,
+					senderKeypair: config.senderKeypair,
+					connection: config.connection,
+					commitment: config.commitment,
+					skipPreflight: config.skipPreflight,
+				})
+
+				if (result.success) {
+					totalSent++
+					results.push({
+						recipientAddress,
+						signature: result.signature,
+						success: true,
+						explorerUrl: result.explorerUrl,
+					})
+					console.log(`✅ Sent to ${recipientAddress}: ${result.signature}`)
+				} else {
+					totalFailed++
+					results.push({
+						recipientAddress,
+						signature: "",
+						success: false,
+						error: result.error,
+					})
+					console.log(`❌ Failed to send to ${recipientAddress}: ${result.error}`)
+
+					if (!config.continueOnError) {
+						console.log("Stopping bulk send due to error (continueOnError=false)")
+						break
+					}
+				}
+
+				// Add delay between transactions if specified
+				if (config.delayBetweenTx && i < config.recipientAddresses.length - 1) {
+					await new Promise((resolve) => setTimeout(resolve, config.delayBetweenTx))
+				}
+			} catch (error) {
+				totalFailed++
+				const errorMessage = error instanceof Error ? error.message : "Unknown error"
+				results.push({
+					recipientAddress,
+					signature: "",
+					success: false,
+					error: errorMessage,
+				})
+				console.log(`❌ Failed to send to ${recipientAddress}: ${errorMessage}`)
+
+				if (!config.continueOnError) {
+					console.log("Stopping bulk send due to error (continueOnError=false)")
+					break
+				}
+			}
+		}
+
+		const overallSuccess = totalFailed === 0
+
+		console.log(`\n📊 Bulk message summary:`)
+		console.log(`Total sent: ${totalSent}`)
+		console.log(`Total failed: ${totalFailed}`)
+		console.log(`Overall success: ${overallSuccess}`)
+
+		return {
+			totalSent,
+			totalFailed,
+			results,
+			overallSuccess,
+		}
+	}
+
+	/**
+	 * Sends memo-only messages to multiple recipients (no SOL transfer)
+	 * Note: These are just memos in separate transactions, not actually sent "to" the recipients
+	 */
+	async sendBulkMemoOnly(config: Omit<BulkMessageConfig, "recipientAddresses"> & { messages?: string[] }): Promise<BulkMessageResult> {
+		const messages = config.messages || [config.message]
+		console.log(`Sending ${messages.length} memo(s)`)
+
+		const results: BulkTransactionResult[] = []
+		let totalSent = 0
+		let totalFailed = 0
+
+		for (let i = 0; i < messages.length; i++) {
+			const message = messages[i]
+
+			try {
+				console.log(`[${i + 1}/${messages.length}] Sending memo: "${message.substring(0, 50)}${message.length > 50 ? "..." : ""}"`)
+
+				const result = await this.sendMemoOnly({
+					message,
+					senderKeypair: config.senderKeypair,
+					connection: config.connection,
+					commitment: config.commitment,
+					skipPreflight: config.skipPreflight,
+				})
+
+				if (result.success) {
+					totalSent++
+					results.push({
+						recipientAddress: "memo-only",
+						signature: result.signature,
+						success: true,
+						explorerUrl: result.explorerUrl,
+					})
+					console.log(`✅ Memo sent: ${result.signature}`)
+				} else {
+					totalFailed++
+					results.push({
+						recipientAddress: "memo-only",
+						signature: "",
+						success: false,
+						error: result.error,
+					})
+					console.log(`❌ Failed to send memo: ${result.error}`)
+
+					if (!config.continueOnError) {
+						console.log("Stopping bulk memo send due to error (continueOnError=false)")
+						break
+					}
+				}
+
+				// Add delay between transactions if specified
+				if (config.delayBetweenTx && i < messages.length - 1) {
+					await new Promise((resolve) => setTimeout(resolve, config.delayBetweenTx))
+				}
+			} catch (error) {
+				totalFailed++
+				const errorMessage = error instanceof Error ? error.message : "Unknown error"
+				results.push({
+					recipientAddress: "memo-only",
+					signature: "",
+					success: false,
+					error: errorMessage,
+				})
+				console.log(`❌ Failed to send memo: ${errorMessage}`)
+
+				if (!config.continueOnError) {
+					console.log("Stopping bulk memo send due to error (continueOnError=false)")
+					break
+				}
+			}
+		}
+
+		const overallSuccess = totalFailed === 0
+
+		console.log(`\n📊 Bulk memo summary:`)
+		console.log(`Total sent: ${totalSent}`)
+		console.log(`Total failed: ${totalFailed}`)
+		console.log(`Overall success: ${overallSuccess}`)
+
+		return {
+			totalSent,
+			totalFailed,
+			results,
+			overallSuccess,
+		}
 	}
 }
