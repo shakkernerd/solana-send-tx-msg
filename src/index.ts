@@ -1,6 +1,7 @@
 import { SolanaMessageSender } from "./messageSender"
 import { WalletUtils } from "./walletUtils"
 import { getConfig } from "./config"
+import { FileUtils } from "./fileUtils"
 import { Keypair } from "@solana/web3.js"
 import defaultExample from "./defaultExample"
 
@@ -45,6 +46,14 @@ function parseCliArgs() {
 				options.continueOnError = true
 				i-- // No value for this flag
 				break
+			case "--recipients-file":
+			case "-f":
+				options.recipientsFile = value || "recipients.txt"
+				break
+			case "--create-sample":
+				options.createSample = true
+				i-- // No value for this flag
+				break
 			case "--help":
 			case "-h":
 				showHelp()
@@ -67,12 +76,18 @@ Usage:
   # Bulk messaging (NEW!)
   npm run dev -- --message "Hello" --recipients <addr1>,<addr2>,<addr3> --bulk
   npm run dev -- --messages "Hello","World","!" --memo-only --bulk
+  
+  # File-based recipients (NEW!)
+  npm run dev -- --message "Hello" --recipients-file recipients.txt
+  npm run dev -- --create-sample  # Create a sample recipients.txt file
 
 Options:
   -m, --message <text>         Message to send
   -r, --recipient <addr>       Recipient address (single)
   --recipients <addr1,addr2>   Comma-separated list of recipient addresses
   --messages <msg1,msg2>       Comma-separated list of messages (for bulk memo)
+  -f, --recipients-file <path> Read recipient addresses from file (default: recipients.txt)
+  --create-sample              Create a sample recipients.txt file and exit
   --memo-only                  Send memo without SOL transfer
   --bulk                       Enable bulk messaging mode
   --delay <ms>                 Delay between transactions in milliseconds
@@ -83,11 +98,17 @@ Examples:
   # Send to multiple recipients
   npm run dev -- --message "Hello everyone!" --recipients "addr1,addr2,addr3" --bulk
   
+  # Send from recipients file
+  npm run dev -- --message "Hello everyone!" --recipients-file recipients.txt
+  
+  # Send from custom file with options
+  npm run dev -- --message "Hello" --recipients-file my-recipients.txt --delay 1000 --continue-on-error
+  
   # Send multiple memos
   npm run dev -- --messages "Hello","World","Test" --memo-only --bulk
   
-  # Bulk send with delay and error handling
-  npm run dev -- --message "Hello" --recipients "addr1,addr2" --bulk --delay 1000 --continue-on-error
+  # Create a sample recipients file
+  npm run dev -- --create-sample
 
 Environment Variables:
   SOLANA_RPC_URL          RPC endpoint (default: devnet)
@@ -102,7 +123,22 @@ Environment Variables:
 async function runCli() {
 	const options = parseCliArgs()
 
-	if (options.message || options.messages || options.bulk) {
+	// Handle create sample option
+	if (options.createSample) {
+		try {
+			console.log("📄 Creating sample recipients.txt file...")
+			await FileUtils.createSampleRecipientsFile()
+			console.log("✅ Sample recipients.txt file created successfully!")
+			console.log("📝 Edit the file to add your recipient addresses, then run:")
+			console.log('   npm run dev -- --message "Hello" --recipients-file recipients.txt')
+			return
+		} catch (error) {
+			console.error("❌ Failed to create sample file:", error)
+			return
+		}
+	}
+
+	if (options.message || options.messages || options.bulk || options.recipientsFile) {
 		try {
 			const config = getConfig()
 			console.log("🚀 Solana Message Sender Starting...")
@@ -122,8 +158,30 @@ async function runCli() {
 
 			console.log(`Sender address: ${senderKeypair.publicKey.toBase58()}`)
 
+			// Handle file-based recipients
+			if (options.recipientsFile) {
+				if (!options.message) {
+					console.log("❌ Message required for file-based sending")
+					console.log("Use --message 'Your message here' --recipients-file recipients.txt")
+					showHelp()
+					return
+				}
+
+				const result = await messageSender.sendMessagesFromFile({
+					message: options.message,
+					recipientsFile: options.recipientsFile,
+					senderKeypair,
+					delayBetweenTx: options.delay,
+					continueOnError: options.continueOnError || false,
+				})
+
+				console.log(`\n📊 Final Results:`)
+				console.log(`Successful: ${result.totalSent}`)
+				console.log(`Failed: ${result.totalFailed}`)
+				console.log(`Overall success: ${result.overallSuccess ? "✅" : "❌"}`)
+			}
 			// Handle bulk messaging
-			if (options.bulk || options.recipients || options.messages) {
+			else if (options.bulk || options.recipients || options.messages) {
 				if (options.memoOnly) {
 					// Bulk memo-only messages
 					const messages = options.messages || [options.message]
@@ -219,4 +277,4 @@ if (require.main === module) {
 }
 
 // Export for library usage
-export { SolanaMessageSender, WalletUtils }
+export { SolanaMessageSender, WalletUtils, FileUtils }
